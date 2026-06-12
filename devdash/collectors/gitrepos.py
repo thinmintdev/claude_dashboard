@@ -100,11 +100,14 @@ def collect_repo(repo: Path, pr_cache: dict[str, list[PrInfo]]) -> RepoInfo:
             untracked_n += 1
         elif line.strip():
             dirty_n += 1
+    from devdash import hub
+
     return RepoInfo(
         path=str(repo), branch=branch, ahead=ahead, behind=behind,
         dirty_n=dirty_n, untracked_n=untracked_n,
         prs=pr_cache.get(str(repo), []),
         wip_claims=_wip_claims(repo),
+        branch_marks=hub.branch_marks(repo),
     )
 
 

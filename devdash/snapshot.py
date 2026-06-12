@@ -15,7 +15,7 @@ from devdash.collectors import gitrepos as git_c
 from devdash.collectors import quota as quota_c
 from devdash.collectors import tmuxmap as tmux_c
 from devdash.collectors.sessions import SessionCollector
-from devdash import boarddoc
+from devdash import boarddoc, hub
 from devdash.config import Config
 from devdash.models import CollectorError, PrInfo, Snapshot
 
@@ -68,16 +68,21 @@ class SnapshotBuilder:
             self._last_git = guard("git", lambda: git_c.collect(
                 self.repos, self.pr_cache), self._last_git)
 
+        unread = guard("hub", hub.unread_counts, {})
+        pad_tail = guard("hub", hub.pad_tail, "")
+
         sidechains = self.sessions.sidechain_ids()
         sess = [s for s in sess if s.id not in sidechains]
         for s in sess:
             s.tmux_target = tmux_map.get(s.id, "")
             s.todos = self._todos_for(s.id)
+            s.unread = unread.get(s.id, 0)
         for a in agents:
             a.tmux_target = tmux_map.get(a.session_id, "")
 
         snap = Snapshot(quota=quota, sessions=sess, agents=agents,
-                        repos=self._last_git, errors=errors)
+                        repos=self._last_git, errors=errors,
+                        scratchpad_tail=pad_tail)
         self._last = snap
         guard("cache", lambda: self.sessions.save_state(
             self.cfg.cache_dir / "state.json"), None)

@@ -7,6 +7,7 @@ dependencies = ["textual>=8.0", "watchdog>=4.0"]
 
 [project.scripts]
 devdash = "devdash.app:main"
+hub = "devdash.hub:main"
 
 [build-system]
 requires = ["setuptools>=68"]

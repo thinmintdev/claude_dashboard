@@ -68,7 +68,7 @@ class QuotaStrip(Static):
 
 
 class SessionsTable(DataTable):
-    COLS = ("", "session", "project", "model", "ctx", "idle", "tok")
+    COLS = ("", "session", "project", "model", "ctx", "idle", "tok", "✉")
 
     def on_mount(self) -> None:
         self.cursor_type = "row"
@@ -95,6 +95,7 @@ class SessionsTable(DataTable):
                 Text(f"{s.ctx_pct:.0f}%", style=ctx_style),
                 _fmt_idle(s.idle_secs),
                 _fmt_tok(s.tokens_turn),
+                Text(str(s.unread), style="bold magenta") if s.unread else "",
                 key=s.id,
             )
         if prev_key is not None:
@@ -127,9 +128,15 @@ class GitPanel(Static):
         t.append(" GIT\n", style="bold #feaf00")
         if not snap.repos:
             t.append("  no active repos found", style="dim")
+        mark_style = {"wip": "yellow", "review": "cyan", "green": "green",
+                      "blocked": "red", "abandoned": "grey50"}
         for r in snap.repos[:8]:
             t.append(f" {_short_path(r.path):<18}", style="")
             t.append(f"{r.branch:<12}", style="green")
+            mark = r.branch_marks.get(r.branch)
+            if mark:
+                t.append(f"[{mark['status']}] ",
+                         style=mark_style.get(mark["status"], "white"))
             flux = []
             if r.ahead:
                 flux.append(f"↑{r.ahead}")
@@ -156,7 +163,7 @@ class GitPanel(Static):
 
 
 class DrillIn(Static):
-    def show_session(self, s: SessionInfo) -> None:
+    def show_session(self, s: SessionInfo, pad_tail: str = "") -> None:
         t = Text()
         t.append(f" {s.id[:8]} — {_short_path(s.cwd)}\n", style="bold #feaf00")
         t.append(f" {s.model}  ctx {s.ctx_pct:.0f}%  "
@@ -172,6 +179,9 @@ class DrillIn(Static):
             t.append("\n")
         t.append(" LAST OUTPUT\n", style="bold")
         t.append(f" {s.last_text[:500]}\n", style="dim")
+        if pad_tail:
+            t.append("\n SCRATCHPAD (hub)\n", style="bold")
+            t.append(f" {pad_tail[-400:]}\n", style="dim")
         t.append("\n [Esc] back", style="dim")
         self.update(t)
 
@@ -328,7 +338,7 @@ class DevDashApp(App):
         if not s:
             return
         drill = self.query_one(DrillIn)
-        drill.show_session(s)
+        drill.show_session(s, self.snap.scratchpad_tail)
         drill.styles.display = "block"
         self.query_one(AgentTreePanel).styles.display = "none"
 

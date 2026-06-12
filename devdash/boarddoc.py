@@ -41,7 +41,8 @@ def render(snap: Snapshot) -> str:
         "",
     ]
     for s in snap.sessions:
-        lines.append(f"### {s.id[:8]} — {s.cwd}  [{s.status}]")
+        badge = f" · ✉{s.unread} unread" if s.unread else ""
+        lines.append(f"### {s.id[:8]} — {s.cwd}  [{s.status}]{badge}")
         lines.append(f"- resume: `claude --resume {s.id}`  (cwd `{s.cwd}`)")
         tmux = f"`{s.tmux_target}`" if s.tmux_target else "none (not in tmux)"
         lines.append(f"- tmux pane: {tmux} · model {s.model} · "
@@ -81,14 +82,22 @@ def render(snap: Snapshot) -> str:
             flux.append(f"{r.dirty_n} modified")
         if r.untracked_n:
             flux.append(f"{r.untracked_n} untracked")
+        mark = r.branch_marks.get(r.branch)
+        chip = f" **[{mark['status']}]** {mark.get('note', '')}" if mark else ""
         lines.append(f"- `{r.path}` on `{r.branch}` "
-                     f"({', '.join(flux) or 'clean'})")
+                     f"({', '.join(flux) or 'clean'}){chip}")
+        for br, m in r.branch_marks.items():
+            if br != r.branch:
+                lines.append(f"  - branch `{br}`: [{m['status']}] "
+                             f"{m.get('note', '')}")
         for pr in r.prs:
             lines.append(f"  - PR #{pr.number} [{pr.checks}] {pr.title}")
         for c in r.wip_claims:
             lines.append(f"  - ⚑ claim by {c.sid[:8]}: {c.intent} "
                          f"({', '.join(c.files[:4])})")
     lines.append("")
+    if snap.scratchpad_tail:
+        lines += ["## Scratchpad (hub, tail)", "", snap.scratchpad_tail, ""]
     if snap.errors:
         lines += ["## Collector errors", ""]
         lines += [f"- {e.collector}: {e.message}" for e in snap.errors]

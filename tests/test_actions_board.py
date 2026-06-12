@@ -111,3 +111,18 @@ def test_board_write_atomic(tmp_path):
     assert out.exists()
     assert not out.with_suffix(".md.tmp").exists()
     assert "dev-dash live board" in out.read_text()
+
+
+def test_board_includes_hub_channels():
+    snap = _snap()
+    snap.scratchpad_tail = "## 22:00 · aaaa1111\nGTT under 80GB"
+    snap.sessions[0].unread = 2
+    snap.repos[0].branch_marks = {
+        "fix/687": {"status": "blocked", "note": "waiting on CI", "ts": 1},
+        "other": {"status": "green", "note": "", "ts": 1},
+    }
+    md = boarddoc.render(snap)
+    assert "✉2 unread" in md
+    assert "**[blocked]** waiting on CI" in md
+    assert "branch `other`: [green]" in md
+    assert "GTT under 80GB" in md

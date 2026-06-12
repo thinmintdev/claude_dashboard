@@ -122,3 +122,11 @@ def test_agent_tree_teams(tmp_path):
     member = next(n for n in nodes if n.kind == "team_member")
     assert member.label == "worker-a"
     assert member.parent_id.startswith("team-")
+
+
+def test_git_collect_includes_branch_marks(tmp_path):
+    from devdash import hub
+    repo = make_repo(tmp_path)
+    hub.branch_set(repo, "main", "review", "ready", sid="s1")
+    info = git_c.collect_repo(repo, {})
+    assert info.branch_marks["main"]["status"] == "review"

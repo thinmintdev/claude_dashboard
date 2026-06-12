@@ -37,6 +37,7 @@ class SessionInfo:
     todos: list[dict] = field(default_factory=list)
     git_branch: str = ""
     version: str = ""
+    unread: int = 0              # hub a2a messages waiting for this session
 
 
 @dataclass
@@ -74,6 +75,8 @@ class RepoInfo:
     untracked_n: int = 0
     prs: list[PrInfo] = field(default_factory=list)
     wip_claims: list[Claim] = field(default_factory=list)
+    # hub branch marks: {branch: {status, note, sid, ts}}
+    branch_marks: dict[str, dict] = field(default_factory=dict)
 
 
 @dataclass
@@ -91,6 +94,7 @@ class Snapshot:
     repos: list[RepoInfo] = field(default_factory=list)
     generated_at: float = field(default_factory=time.time)
     errors: list[CollectorError] = field(default_factory=list)
+    scratchpad_tail: str = ""    # hub global scratchpad, last ~1200 chars
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))
@@ -116,4 +120,5 @@ class Snapshot:
             ],
             generated_at=d["generated_at"],
             errors=[CollectorError(**e) for e in d["errors"]],
+            scratchpad_tail=d.get("scratchpad_tail", ""),
         )

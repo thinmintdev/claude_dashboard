@@ -94,6 +94,71 @@ default = 200000
 If a session's observed prompt tokens exceed its configured window, the 1M
 tier is inferred automatically (model id strings carry no context marker).
 
+## Enabling agent teams in tmux (recommended companion setup)
+
+dev-dash gets dramatically more useful when Claude Code's **agent teams**
+run as visible tmux panes — every teammate becomes a real pane the board
+can map, jump to, steer, and kill. Two settings in `~/.claude/settings.json`:
+
+```json
+{
+  "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" },
+  "teammateMode": "tmux"
+}
+```
+
+- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` enables the experimental teams
+  feature (the `TeamCreate` / `SendMessage` tools and teammate spawning).
+- `"teammateMode": "tmux"` makes every spawned teammate open as a tmux
+  pane/window in the session Claude is running in, instead of running
+  invisibly. The main agent stays in pane 0; teammates appear as new
+  windows or splits.
+
+For this to work, **run Claude Code inside tmux** (`tmux new -s work`,
+then `claude`). With both set:
+
+- teammates show up in dev-dash's sessions table with a tmux target, so
+  `Enter`/`s`/`i`/`x` work on them like any session
+- team inboxes (`~/.claude/teams/<id>/inboxes/`) render under the agent
+  tree automatically
+- a crashed teammate is recoverable: `tmux kill-pane` on the wedged pane
+  leaves the main session intact (or use `x` from the board)
+
+Useful raw tmux moves when you're outside the board: `tmux attach -t
+<session> -r` (read-only follow), `C-b w` (window/pane picker),
+`tmux capture-pane -t <target> -p -S -2000` (read a teammate's scrollback
+without attaching).
+
+## hub — shared state for agents & sessions
+
+`hub` (installed as `~/.claude/bin/hub`, also a `/hub` skill) lets any
+session, agent, or human read/write coordination state that the board and
+BOARD.md render live:
+
+```bash
+hub branch set review "PR up, needs CI"     # mark branch status (per-repo)
+hub branch set blocked "waiting on #719" --branch fix/687
+hub pad "decision: GTT stays under 80GB"    # global append-only scratchpad
+hub send a5c3 "rebase before pushing"       # message another session
+hub send all "deploying in 5min" --nudge    # broadcast + tmux status flash
+hub inbox --mark-read                       # read your messages
+```
+
+Branch marks (`wip/review/green/blocked/abandoned`) show as chips in the
+GIT panel; unread message counts show as a ✉ column on session rows.
+**Delivery is hook-based**: register the `UserPromptSubmit` hook so unread
+messages are injected into the recipient's context on their next turn:
+
+```json
+{ "hooks": { "UserPromptSubmit": [ { "hooks": [ { "type": "command",
+  "command": "~/.claude/dev-dash/.venv/bin/hub deliver-hook" } ] } ] } }
+```
+
+Same-team agents should keep using the native teams `SendMessage`; hub
+covers cross-session, cross-team, and human-to-session messaging.
+Messages TTL out after 7 days. Spec:
+`docs/superpowers/specs/2026-06-11-hub-design.md`.
+
 ## Crash recovery
 
 The board continuously (atomically) rewrites **`BOARD.md`** in the repo
@@ -140,8 +205,5 @@ live sessions required.
 
 ## Roadmap
 
-- **hub** — shared read/write layer for agents: branch-status marks, global
-  scratchpad, session-to-session messages with hook-based delivery
-  (spec: `docs/superpowers/specs/2026-06-11-hub-design.md`)
 - remote hosts (collect from other machines over SSH)
 - web front-end on the Snapshot contract
