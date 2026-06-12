@@ -1,0 +1,19 @@
+[project]
+name = "devdash"
+version = "0.1.0"
+description = "Glanceable tmux TUI dashboard for Claude Code sessions, teams, git activity, and usage metrics"
+requires-python = ">=3.11"
+dependencies = ["textual>=8.0", "watchdog>=4.0"]
+
+[project.scripts]
+devdash = "devdash.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["devdash*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
