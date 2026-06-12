@@ -64,7 +64,7 @@ per-project hogs).
 
 - Session JSONLs: watchdog filesystem events, debounced ~1s
 - git local state: 10s poll · `gh` PRs: 60s poll (worker threads)
-- tmux map: every refresh tick
+- tmux map: on every snapshot rebuild (i.e., whenever any collector updates)
 
 ## Data model
 
@@ -82,6 +82,11 @@ Snapshot
 
 The `Snapshot → to_json() → from_json()` round-trip is the Phase-2 web API
 contract and is pinned by test from day one.
+
+**ctx_pct definition:** from the latest assistant event's usage —
+`(input_tokens + cache_read_input_tokens + cache_creation_input_tokens) /
+model_context_window`, with the window looked up from a small static
+model→window table (overridable in `config.toml`).
 
 ## UI (Layout A: Mission Control)
 
