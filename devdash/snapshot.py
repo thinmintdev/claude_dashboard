@@ -15,6 +15,7 @@ from devdash.collectors import gitrepos as git_c
 from devdash.collectors import quota as quota_c
 from devdash.collectors import tmuxmap as tmux_c
 from devdash.collectors.sessions import SessionCollector
+from devdash import boarddoc
 from devdash.config import Config
 from devdash.models import CollectorError, PrInfo, Snapshot
 
@@ -80,4 +81,5 @@ class SnapshotBuilder:
         self._last = snap
         guard("cache", lambda: self.sessions.save_state(
             self.cfg.cache_dir / "state.json"), None)
+        guard("board", lambda: boarddoc.write(snap), None)
         return snap

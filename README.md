@@ -28,7 +28,15 @@ As a Claude Code skill: symlink `skill/` to `~/.claude/skills/dev-dash`,
 then `/dev-dash` from any session.
 
 **Keys:** `Enter` jump to the selected session's tmux pane · `d` drill-in
-(transcript tail, todos, token breakdown) · `Esc` back · `r` refresh · `q` quit.
+(transcript tail, todos, token breakdown) · `h` handoff (types `/handoff`
+into the session) · `s` steer (send a message) · `i` interrupt · `x` kill ·
+`w` release wip claims · `Esc` back · `r` refresh · `q` quit.
+Destructive actions are confirmation-gated.
+
+**Crash recovery:** the board continuously rewrites
+`~/.claude/dev-dash/BOARD.md` (atomic) with per-session resume commands,
+tmux panes, branches, todos, and last output — read it after a crash to
+pick up where everything left off.
 
 ## How it works
 

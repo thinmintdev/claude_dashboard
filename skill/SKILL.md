@@ -22,7 +22,17 @@ tmux commands; do not start `devdash` directly.
 ## Board keys (tell the user if asked)
 
 `Enter` jump to selected session's tmux pane · `d` drill-in (transcript
-tail, todos, token breakdown) · `Esc` back · `r` force refresh · `q` quit.
+tail, todos, token breakdown) · `h` send /handoff to session (confirm) ·
+`s` steer (type a message into the session) · `i` interrupt (Escape) ·
+`x` kill session (confirm) · `w` release session's wip claims (confirm) ·
+`Esc` back · `r` force refresh · `q` quit.
+
+## Crash recovery
+
+The board continuously rewrites `~/.claude/dev-dash/BOARD.md` — per-session
+resume commands (`claude --resume <id>`), tmux panes, branches, open todos,
+last output, repo/PR/claim state. After a crash, read that file to get back
+to where everything left off.
 
 ## Maintenance notes
 

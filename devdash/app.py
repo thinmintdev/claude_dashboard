@@ -15,7 +15,8 @@ from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import DataTable, Footer, Static, Tree
+from textual.screen import ModalScreen
+from textual.widgets import DataTable, Footer, Input, Label, Static, Tree
 
 from devdash import actions
 from devdash.config import load
@@ -180,6 +181,62 @@ def _short_path(p: str) -> str:
     return (p or "?").replace(home, "~")[:22]
 
 
+class ConfirmScreen(ModalScreen[bool]):
+    """y/n confirmation gate for destructive actions."""
+
+    BINDINGS = [Binding("y", "yes", "yes"), Binding("n", "no", "no"),
+                Binding("escape", "no", show=False)]
+    CSS = """
+    ConfirmScreen { align: center middle; }
+    #confirm-box { width: 60; padding: 1 2; border: heavy $warning;
+                   background: $surface; }
+    """
+
+    def __init__(self, message: str):
+        super().__init__()
+        self.message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-box"):
+            yield Label(self.message)
+            yield Label("[b]y[/b] confirm · [b]n[/b] cancel", markup=True)
+
+    def action_yes(self) -> None:
+        self.dismiss(True)
+
+    def action_no(self) -> None:
+        self.dismiss(False)
+
+
+class SteerScreen(ModalScreen[str | None]):
+    """Free-text input sent to the selected session's prompt."""
+
+    BINDINGS = [Binding("escape", "cancel", show=False)]
+    CSS = """
+    SteerScreen { align: center middle; }
+    #steer-box { width: 80; padding: 1 2; border: heavy $accent;
+                 background: $surface; }
+    """
+
+    def __init__(self, session_label: str):
+        super().__init__()
+        self.session_label = session_label
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="steer-box"):
+            yield Label(f"steer {self.session_label} — message (Enter sends, Esc cancels)")
+            yield Input(placeholder="type instruction for the session…")
+
+    def on_mount(self) -> None:
+        self.query_one(Input).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class DevDashApp(App):
     TITLE = "dev-dash"
     CSS = """
@@ -193,9 +250,14 @@ class DevDashApp(App):
     DrillIn { border: solid $primary 30%; padding: 0 1; display: none; }
     """
     BINDINGS = [
-        Binding("enter", "jump", "jump-to", priority=True),
+        Binding("enter", "jump", "jump-to"),
         Binding("d", "drill", "drill-in"),
         Binding("escape", "undrill", show=False),
+        Binding("h", "handoff", "handoff"),
+        Binding("s", "steer", "steer"),
+        Binding("i", "interrupt", "interrupt"),
+        Binding("x", "kill", "kill"),
+        Binding("w", "release_wip", "release-wip"),
         Binding("r", "refresh", "refresh"),
         Binding("q", "quit", "quit"),
     ]
@@ -248,6 +310,11 @@ class DevDashApp(App):
 
     # -- actions ---------------------------------------------------------------
 
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        # Enter on the focused table selects a row → jump (the app-level
+        # binding can't be priority or it would steal Enter from modals)
+        self.action_jump()
+
     def action_jump(self) -> None:
         s = self._selected_session()
         if not s:
@@ -272,6 +339,77 @@ class DevDashApp(App):
     def action_refresh(self) -> None:
         self.refresh_prs_bg()
         self.refresh_snapshot(include_git=True)
+
+    # -- control actions (Phase 3) — confirmation-gated where destructive ----
+
+    def _report(self, err: str, ok_msg: str) -> None:
+        if err:
+            self.notify(err, severity="warning", timeout=4)
+        else:
+            self.notify(ok_msg, timeout=3)
+
+    def action_handoff(self) -> None:
+        s = self._selected_session()
+        if not s:
+            return
+        def done(yes: bool | None) -> None:
+            if yes:
+                self._report(actions.handoff(s.tmux_target),
+                             f"/handoff sent to {s.id[:8]}")
+        self.push_screen(
+            ConfirmScreen(f"Send /handoff to {s.id[:8]} ({_short_path(s.cwd)})?"),
+            done)
+
+    def action_steer(self) -> None:
+        s = self._selected_session()
+        if not s:
+            return
+        def done(text: str | None) -> None:
+            if text:
+                self._report(actions.steer(s.tmux_target, text),
+                             f"sent to {s.id[:8]}")
+        self.push_screen(SteerScreen(f"{s.id[:8]} ({_short_path(s.cwd)})"), done)
+
+    def action_interrupt(self) -> None:
+        s = self._selected_session()
+        if not s:
+            return
+        self._report(actions.interrupt(s.tmux_target),
+                     f"interrupt sent to {s.id[:8]}")
+
+    def action_kill(self) -> None:
+        s = self._selected_session()
+        if not s:
+            return
+        def done(yes: bool | None) -> None:
+            if yes:
+                self._report(actions.kill_session(s.tmux_target),
+                             f"killed {s.id[:8]}")
+                self.refresh_snapshot()
+        self.push_screen(
+            ConfirmScreen(f"KILL session {s.id[:8]} — tmux pane "
+                          f"{s.tmux_target or '?'} ({_short_path(s.cwd)})?"),
+            done)
+
+    def action_release_wip(self) -> None:
+        s = self._selected_session()
+        if not s:
+            return
+        holding = [r for r in self.snap.repos
+                   if any(c.sid.startswith(s.id) for c in r.wip_claims)]
+        if not holding:
+            self.notify(f"{s.id[:8]} holds no wip claims", timeout=3)
+            return
+        names = ", ".join(_short_path(r.path) for r in holding)
+        def done(yes: bool | None) -> None:
+            if not yes:
+                return
+            errs = [e for r in holding
+                    if (e := actions.release_claims(r.path, s.id))]
+            self._report("; ".join(errs), f"released claims in {names}")
+            self.refresh_snapshot(include_git=True)
+        self.push_screen(
+            ConfirmScreen(f"Release {s.id[:8]}'s wip claims in {names}?"), done)
 
 
 def main() -> None:

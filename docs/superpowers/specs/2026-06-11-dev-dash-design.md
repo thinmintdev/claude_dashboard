@@ -157,3 +157,17 @@ Degrade per-panel, never crash, never lie:
 - No cost-in-dollars precision (token counts and quota %, not billing)
 - No persistence/history DB — live board only (trends computed over the
   current day's JSONLs)
+
+## Amendment 2026-06-11 (same day)
+
+- **TUI-only for now** — Phase 2 web front-end deferred at user direction;
+  Snapshot JSON contract remains pinned for when it lands.
+- **Phase 3 actions landed early** (all via `actions.py`, destructive ones
+  confirmation-gated in the UI): `h` handoff (types `/handoff` into the
+  session's pane), `s` steer (free-text message), `i` interrupt (Escape),
+  `x` kill (tmux kill-pane), `w` release the session's wip claims.
+- **Live recovery doc** — `devdash/boarddoc.py` atomically rewrites
+  `~/.claude/dev-dash/BOARD.md` on every snapshot: per-session
+  `claude --resume` commands, tmux panes, branches, open todos, last
+  output, repo/PR/claim state. Complements machine-state
+  `~/.cache/dev-dash/state.json` (offsets + quota events).

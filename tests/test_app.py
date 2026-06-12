@@ -74,3 +74,46 @@ async def test_jump_without_tmux_notifies_not_crashes(monkeypatch):
     async with app.run_test() as pilot:
         await pilot.press("enter")   # no tmux target mapped → warning toast
         await pilot.pause()
+
+
+@pytest.mark.asyncio
+async def test_kill_requires_confirmation(monkeypatch):
+    killed = []
+    from devdash import actions as actions_mod
+    monkeypatch.setattr(actions_mod, "kill_session",
+                        lambda t: killed.append(t) or "")
+    app = DevDashApp(builder=StubBuilder())
+    async with app.run_test() as pilot:
+        await pilot.press("x")            # confirm modal opens
+        await pilot.press("n")            # decline
+        assert killed == []
+        await pilot.press("x")
+        await pilot.press("y")            # confirm
+        assert len(killed) == 1
+
+
+@pytest.mark.asyncio
+async def test_steer_modal_sends_text(monkeypatch):
+    sent = []
+    from devdash import actions as actions_mod
+    monkeypatch.setattr(actions_mod, "steer",
+                        lambda t, txt: sent.append((t, txt)) or "")
+    app = DevDashApp(builder=StubBuilder())
+    async with app.run_test() as pilot:
+        await pilot.press("s")
+        for ch in "go":
+            await pilot.press(ch)
+        await pilot.press("enter")
+        assert sent == [("", "go")]
+
+
+@pytest.mark.asyncio
+async def test_handoff_confirm_flow(monkeypatch):
+    sent = []
+    from devdash import actions as actions_mod
+    monkeypatch.setattr(actions_mod, "handoff", lambda t: sent.append(t) or "")
+    app = DevDashApp(builder=StubBuilder())
+    async with app.run_test() as pilot:
+        await pilot.press("h")
+        await pilot.press("y")
+        assert len(sent) == 1
